@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Duty Mapping Tool (Updated)</title>
+  <style>
+    * { box-sizing: border-box; font-weight: bold !important; }
+
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0; padding: 0;
+      min-height: 100vh;
+      display: flex; justify-content: center; align-items: flex-start;
+      background: linear-gradient(135deg, #000000, #aa0000);  /* BLACK → RED */
+      color: #000;
+    }
+
+    .app-wrapper { width: 100%; max-width: 960px; padding: 24px 16px; }
+
+    .card {
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 22px 24px 26px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+      border: 2px solid #aa0000;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 26px;
+      margin: 0 0 6px;
+      color: #aa0000;   /* RED */
+    }
+
+    .subtitle {
+      text-align: center;
+      font-size: 14px;
+      color: #000000;
+      margin-bottom: 18px;
+    }
+
+    .top-row { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 10px; }
+
+    .box {
+      flex: 1; min-width: 220px;
+      border-radius: 10px;
+      padding: 10px 12px 12px;
+      background: #fff5f5;       /* LIGHT RED */
+      border: 1px solid #cc0000;
+    }
+
+    label { font-size: 14px; color: #aa0000; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 18px;
+      font-size: 14px;
+    }
+
+    th, td {
+      border: 1px solid #cc0000;
+      padding: 8px 10px;
+    }
+
+    th {
+      background: #000000;
+      color: #ffffff;
+    }
+
+    tr:nth-child(even) td { background: #fff0f0; }
+    tr:hover td { background: #ffe5e5; }
+
+    select, input[type="date"] {
+      padding: 6px 8px;
+      margin-top: 4px;
+      min-width: 180px;
+      border-radius: 6px;
+      border: 1px solid #aa0000;
+      font-size: 14px;
+      background: #ffffff;
+      color: #000;
+    }
+
+    select:focus, input[type="date"]:focus {
+      border-color: #ff0000;
+      box-shadow: 0 0 0 1px rgba(255, 0, 0, 0.35);
+    }
+
+    button {
+      padding: 10px 22px;
+      margin-top: 12px;
+      cursor: pointer;
+      border-radius: 999px;
+      border: none;
+      font-size: 14px;
+      letter-spacing: 0.7px;
+    }
+
+    #generateBtn {
+      background: #aa0000;
+      color: #ffffff;
+      box-shadow: 0 8px 18px rgba(170, 0, 0, 0.4);
+    }
+
+    #generateBtn:hover {
+      background: #880000;
+      transform: translateY(-1px);
+    }
+
+    #pdfBtn {
+      background: #000000;
+      color: #ffffff;
+      margin-left: 10px;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
+    }
+
+    #pdfBtn:hover {
+      background: #333333;
+      transform: translateY(-1px);
+    }
+
+    .error { color: #ff0000; font-size: 14px; margin-top: 8px; }
+  </style>
+</head>
+
+<body>
+  <div class="app-wrapper">
+    <div class="card">
+      <h1>Duty Mapping Tool</h1>
+      <div class="subtitle">Auto rotation · Smart mapping · PDF export</div>
+
+      <div class="top-row">
+        <div class="box">
+          <label>Date:</label><br>
+          <input type="date" id="dutyDate" />
+          <div class="small-note">Rotation start: <b>14-11-2025</b>, cycle: <b>16 din</b></div>
+        </div>
+
+        <div class="box">
+          <label>Number of persons present:</label><br>
+          <select id="personCount">
+            <option value="8">8</option>
+            <option value="7">7</option>
+            <option value="6">6</option>
+            <option value="5">5</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="box" id="nameInputs"></div>
+
+      <div class="button-row">
+        <button id="generateBtn">Duty Mapping Banao</button>
+        <button id="pdfBtn" style="display:none;">Download PDF</button>
+      </div>
+
+      <div id="errorMsg" class="error"></div>
+      <div id="output"></div>
+    </div>
+  </div>
+
+  <script>
+    const basePersons = [ 'Rahman', 'Jyoti', 'Arun Singh', 'Kaushik', 'Vikram', 'Bishnu', 'Ranjit', 'Arun Das' ];
+
+    const nameInputsDiv = document.getElementById('nameInputs');
+    const personCountSelect = document.getElementById('personCount');
+    const errorDiv = document.getElementById('errorMsg');
+    const outputDiv = document.getElementById('output');
+    const pdfBtn = document.getElementById('pdfBtn');
+
+    function renderNameInputs() {
+      const count = parseInt(personCountSelect.value, 10);
+      nameInputsDiv.innerHTML = '';
+      for (let i = 1; i <= count; i++) {
+        const div = document.createElement('div');
+        div.style.marginBottom = '6px';
+        const select = document.createElement('select');
+        select.id = 'person_' + i;
+        select.className = 'personSelect';
+        div.innerHTML = `Person ${i}: `;
+        div.appendChild(select);
+        nameInputsDiv.appendChild(div);
+      }
+      updateSelectOptions();
+      document.querySelectorAll('.personSelect').forEach(sel => sel.addEventListener('change', updateSelectOptions));
+    }
+
+    function updateSelectOptions() {
+      const selects = Array.from(document.querySelectorAll('.personSelect'));
+      const selectedValues = selects.map(s => s.value).filter(v => v);
+      selects.forEach(select => {
+        const current = select.value;
+        select.innerHTML = '';
+        basePersons.forEach(name => {
+          if (selectedValues.includes(name) && name !== current) return;
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          select.appendChild(opt);
+        });
+        if (current && Array.from(select.options).some(o => o.value === current)) {
+          select.value = current;
+        }
+      });
+    }
+
+    function dutiesFor(count) {
+      if (count === 8) {
+        return ['B-2','TG-1 (8.5 m) + TG-1 (0 m)','MF-1','MF-2','LDO + CW','TG-2 (8.5 m) + TG-2 (0 m) + DM + Fire','B-1','TG-2 (8.5 m) + TG-2 (0 m) + COMP + SCS'];
+      }
+      if (count === 7) {
+        return ['B-1','B-2','TG-1 (8.5 m) + TG-1 (0 m) + DM + Fire','TG-2 (8.5 m) + TG-2 (0 m) + COMP + SCS','MF-1','MF-2','LDO + CW'];
+      }
+      if (count === 6) {
+        return ['B-1 + CW','B-2 + COMP + SCS','TG-1 (8.5 m) + TG-1 (0 m)','TG-2 (8.5 m) + TG-2 (0 m)','MF-1 + LDO','MF-2 + DM + Fire'];
+      }
+      if (count === 5) {
+        return ['B-1 + TG-1 (8.5 m)','B-2 + TG-2 (8.5 m)','TG-1 (0 m) + TG-2 (0 m) + CW + COMP + SCS','MF-1 + LDO','MF-2 + DM + Fire'];
+      }
+      return [];
+    }
+
+    function rotatedPersonsForDate(dateStr) {
+      const baseDate = new Date('2025-11-14');
+      let targetDate = new Date(dateStr);
+      if (isNaN(targetDate.getTime())) targetDate = baseDate;
+      const diffDays = Math.floor((targetDate - baseDate) / (24 * 60 * 60 * 1000));
+      const blockIndex = Math.floor(diffDays / 16);
+      const len = basePersons.length;
+      let shift = blockIndex % len;
+      if (shift < 0) shift += len;
+      let arr = basePersons.slice();
+      for (let i = 0; i < shift; i++) arr.unshift(arr.pop());
+      return arr;
+    }
+
+    function generateMapping() {
+      errorDiv.textContent = '';
+      outputDiv.innerHTML = '';
+      pdfBtn.style.display = 'none';
+      const dateStr = document.getElementById('dutyDate').value;
+      const count = parseInt(personCountSelect.value, 10);
+      const selects = Array.from(document.querySelectorAll('.personSelect'));
+      const chosenNames = selects.map(s => s.value).filter(v => v);
+      const uniqueNames = Array.from(new Set(chosenNames));
+
+      if (uniqueNames.length !== count) {
+        errorDiv.textContent = 'Please select ' + count + ' unique persons.';
+        return;
+      }
+
+      const rotated = rotatedPersonsForDate(dateStr);
+      const chosenSet = new Set(uniqueNames);
+      const presentOrdered = rotated.filter(name => chosenSet.has(name));
+
+      if (presentOrdered.length !== count) {
+        errorDiv.textContent = 'Selected persons mismatch rotation list.';
+        return;
+      }
+
+      const duties = dutiesFor(count);
+      let html = `<h2 style="color:#aa0000;">Date: ${dateStr || '—'}</h2>`;
+      html += '<table><tr><th>Post No.</th><th>Duty</th><th>Person</th></tr>';
+
+      for (let i = 0; i < count; i++) {
+        html += `<tr><td>${i + 1}</td><td>${duties[i]}</td><td>${presentOrdered[i]}</td></tr>`;
+      }
+
+      html += '</table>';
+      outputDiv.innerHTML = html;
+    }
+
+    renderNameInputs();
+    personCountSelect.addEventListener('change', renderNameInputs);
+    document.getElementById('generateBtn').addEventListener('click', generateMapping);
+  </script>
+
+</body>
+</html>
